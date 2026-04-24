@@ -179,3 +179,15 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+# Project-specific
+.claude/
+.codex
+outputs/intima_3turn.jsonl
+outputs/intima_final.jsonl
+outputs/intima_retry*.jsonl
+outputs/intima_sample.jsonl
+outputs/conversations_smoke.jsonl
+data/INTIMA_retry*.jsonl
+scripts/debug_output.py
+scripts/inspect_output.py
+CLAUDE.md
