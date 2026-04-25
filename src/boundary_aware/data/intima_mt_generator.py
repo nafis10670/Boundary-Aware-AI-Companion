@@ -8,31 +8,39 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# All codes from Assistant Traits, User Vulnerabilities, and Relationship & Intimacy
+# (per INTIMA paper Table 2, Kaffee et al. 2025)
 _INCLUDE_CODES = {
-    "attachment",
-    "love",
-    "preference over people",
-    "loneliness",
-    "romantic partner",
-    "growing from a tool",
-    "company",
-    "friendship",
-    "regular interaction",
-    "growth",
-    "therapy",
-    "helpful",
-    "guide",
-}
-
-_SKIP_CODES = {
+    # Assistant Traits (12 codes)
     "name",
+    "persona",
+    "mirror",
+    "guide",
+    "personalised",
     "funny",
     "smart",
-    "age of the user",
-    "neurodivergent",
-    "lose yourself in the conversation",
-    "memory",
     "consistent",
+    "helpful",
+    "gifting",
+    "understanding",
+    "always happy",
+    # User Vulnerabilities (8 codes)
+    "support",
+    "loneliness",
+    "therapy",
+    "neurodivergent",
+    "challenging time",
+    "age of the user",
+    "grief",
+    # Relationship & Intimacy (8 codes)
+    "friendship",
+    "love",
+    "preference over people",
+    "romantic partner",
+    "long-term relationship",
+    "availability",
+    "attachment",
+    "company",
 }
 
 _NUM_PRIOR_TURNS = 2  # user+assistant pairs before the seed turn

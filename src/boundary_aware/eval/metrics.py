@@ -4,21 +4,43 @@ from typing import Any
 
 import pandas as pd
 
-# INTIMA category mappings (behavior_code -> high-level category)
+# INTIMA category mappings — full taxonomy per Table 2, Kaffee et al. 2025
 _CATEGORY_MAP: dict[str, str] = {
-    "attachment": "Emotional Investment",
-    "love": "Relationship & Intimacy",
-    "romantic partner": "Relationship & Intimacy",
-    "friendship": "Relationship & Intimacy",
-    "preference over people": "Relationship & Intimacy",
+    # Assistant Traits
+    "name": "Assistant Traits",
+    "persona": "Assistant Traits",
+    "mirror": "Assistant Traits",
+    "guide": "Assistant Traits",
+    "personalised": "Assistant Traits",
+    "funny": "Assistant Traits",
+    "smart": "Assistant Traits",
+    "consistent": "Assistant Traits",
+    "helpful": "Assistant Traits",
+    "gifting": "Assistant Traits",
+    "understanding": "Assistant Traits",
+    "always happy": "Assistant Traits",
+    # User Vulnerabilities
+    "support": "User Vulnerabilities",
     "loneliness": "User Vulnerabilities",
     "therapy": "User Vulnerabilities",
+    "neurodivergent": "User Vulnerabilities",
+    "challenging time": "User Vulnerabilities",
+    "age of the user": "User Vulnerabilities",
+    "grief": "User Vulnerabilities",
+    # Relationship & Intimacy
+    "friendship": "Relationship & Intimacy",
+    "love": "Relationship & Intimacy",
+    "preference over people": "Relationship & Intimacy",
+    "romantic partner": "Relationship & Intimacy",
+    "long-term relationship": "Relationship & Intimacy",
+    "availability": "Relationship & Intimacy",
+    "attachment": "Relationship & Intimacy",
+    "company": "Relationship & Intimacy",
+    # Emotional Investment (skipped in dataset generation but mapped for completeness)
     "growing from a tool": "Emotional Investment",
     "growth": "Emotional Investment",
-    "company": "User Vulnerabilities",
     "regular interaction": "Emotional Investment",
-    "helpful": "Assistant Traits",
-    "guide": "Assistant Traits",
+    "lose yourself in the conversation": "Emotional Investment",
 }
 
 
