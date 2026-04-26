@@ -1,11 +1,15 @@
 import logging
 import pathlib
-import sys
 
 import typer
 
 app = typer.Typer(help="Boundary-Aware Multi-Agent Conversational System")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
+def _safe_run_id(model: str) -> str:
+    """Convert a model tag to a filesystem-safe run directory name."""
+    return model.replace(":", "_").replace("/", "_").replace(".", "_")
 
 
 @app.command()
@@ -38,18 +42,52 @@ def run_one(
 @app.command()
 def evaluate(
     dataset: pathlib.Path = typer.Option(..., help="Path to JSONL dataset"),
-    run_id: str = typer.Option(..., help="Unique run identifier for output directory"),
-    skip_judge: bool = typer.Option(False, help="Skip LLM judging (faster, no ANTHROPIC_API_KEY needed)"),
+    models: list[str] = typer.Option(
+        ..., "--model", help="Model(s) to evaluate. Repeat the flag for each model."
+    ),
+    run_id_prefix: str = typer.Option(
+        "", "--run-id-prefix", help="Optional prefix prepended to each model's result directory"
+    ),
+    skip_judge: bool = typer.Option(False, help="Skip LLM judging"),
 ) -> None:
-    """Run full evaluation: system + baseline responses, LLM judging, and metrics."""
+    """Evaluate one or more models sequentially. Each model gets its own result directory.
+
+    Examples:
+      Single model:
+        boundary-aware evaluate --dataset data/intima_mt.jsonl --model phi4:14b
+
+      Multiple models (repeat --model):
+        boundary-aware evaluate --dataset data/intima_mt.jsonl \\
+            --model phi4:14b \\
+            --model qwen2.5:32b-instruct-q4_K_M \\
+            --model mistral-nemo:12b
+    """
     from boundary_aware.eval.metrics import compute_metrics
     from boundary_aware.eval.runner import run_evaluation
 
-    responses_file = run_evaluation(dataset, run_id, skip_judge=skip_judge)
-    if not skip_judge:
-        compute_metrics(run_id)
-    else:
-        typer.echo(f"Responses written to {responses_file}. Skipped judging and metrics.")
+    typer.echo(f"Models to evaluate: {models}")
+    typer.echo(f"Dataset: {dataset}")
+    typer.echo("")
+
+    for model in models:
+        safe = _safe_run_id(model)
+        run_id = f"{run_id_prefix}_{safe}" if run_id_prefix else safe
+
+        typer.echo(f"{'='*60}")
+        typer.echo(f"Model  : {model}")
+        typer.echo(f"Run ID : {run_id}")
+        typer.echo(f"{'='*60}")
+
+        responses_file = run_evaluation(dataset, run_id, model=model, skip_judge=skip_judge)
+
+        if not skip_judge:
+            compute_metrics(run_id)
+        else:
+            typer.echo(f"Responses written to {responses_file}. Skipped judging and metrics.")
+
+        typer.echo("")
+
+    typer.echo(f"All done. Results in data/results/")
 
 
 @app.command()
