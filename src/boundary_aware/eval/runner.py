@@ -3,6 +3,8 @@ import logging
 import os
 import pathlib
 
+from tqdm import tqdm
+
 from boundary_aware.data.load import load_dataset
 from boundary_aware.eval.baseline import generate_baseline_response
 from boundary_aware.eval.judge import judge_response
@@ -57,7 +59,7 @@ def _run(
     )
 
     with open(responses_file, "w") as fh:
-        for conv in conversations:
+        for conv in tqdm(conversations, desc="Evaluating", unit="conv", ncols=80):
             logger.info("Processing %s", conv.conversation_id)
             try:
                 state = run(conv.turns)

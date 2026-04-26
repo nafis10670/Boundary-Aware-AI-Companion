@@ -1,10 +1,24 @@
 import logging
 import pathlib
+import sys
 
 import typer
 
 app = typer.Typer(help="Boundary-Aware Multi-Agent Conversational System")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
+def _configure_logging(log_file: pathlib.Path | None = None) -> None:
+    fmt = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.setLevel(logging.INFO)
+    if log_file:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        handler: logging.Handler = logging.FileHandler(log_file, mode="a")
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter(fmt))
+    root.addHandler(handler)
 
 
 def _safe_run_id(model: str) -> str:
@@ -20,6 +34,7 @@ def run_one(
     ),
 ) -> None:
     """Run a single conversation through the pipeline and print the result."""
+    _configure_logging()
     from boundary_aware.data.load import load_dataset
     from boundary_aware.graph.workflow import run
 
@@ -78,6 +93,10 @@ def evaluate(
         typer.echo(f"Run ID : {run_id}")
         typer.echo(f"{'='*60}")
 
+        log_file = pathlib.Path("data/results") / run_id / "eval.log"
+        _configure_logging(log_file)
+        typer.echo(f"Logging to {log_file}")
+
         responses_file = run_evaluation(dataset, run_id, model=model, skip_judge=skip_judge)
 
         if not skip_judge:
@@ -99,6 +118,7 @@ def generate_data(
     provider: str = typer.Option("anthropic", help="LLM provider: anthropic or openai"),
 ) -> None:
     """Generate the INTIMA-MT dataset from the INTIMA HuggingFace benchmark."""
+    _configure_logging()
     from boundary_aware.data.intima_mt_generator import generate
 
     generate(output, max_per_code=max_per_code, provider=provider)

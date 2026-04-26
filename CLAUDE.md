@@ -356,26 +356,53 @@ Output: `data/results/{run_id}/summary.csv` and `data/results/{run_id}/report.md
 - **Linting**: `ruff` for both lint and format. `ruff check` and `ruff format` should pass clean.
 - **No print statements** in `src/`. Use logging.
 
+## Environment
+
+**Hardware**: Two NVIDIA RTX A6000 GPUs (49 GB VRAM each). GPU 0 is typically occupied by other processes; use **GPU 1** for all experiment runs.
+
+**Python**: `.venv/` exists in the project root (Python 3.12). `pip` is not pre-installed in the venv — bootstrap it once with:
+```bash
+.venv/bin/python -m ensurepip
+```
+
+**Ollama GPU targeting**: Ollama reads `CUDA_VISIBLE_DEVICES` at server startup, not per-request. To run on GPU 1, restart the server before evaluating:
+```bash
+CUDA_VISIBLE_DEVICES=1 ollama serve
+```
+
+**Dataset**: The generated INTIMA-MT dataset lives at `outputs/intima_complete.jsonl` (375 conversations). This is the file to pass to `--dataset` for evaluation and smoke tests.
+
+**Judge note**: `eval/judge.py` currently calls Ollama (same backbone model) rather than a frontier model API. This diverges from the spec. The team should decide whether to switch it to Claude/GPT-4 before the final evaluation run.
+
 ## How to Run
 
 ```bash
-# Install
-pip install -e .
+# One-time: bootstrap pip in the venv, then install
+.venv/bin/python -m ensurepip
+.venv/bin/python -m pip install -e .
 
-# Pull the model
+# Pull the model (if not already present)
 ollama pull llama3.1:8b-instruct-q4_K_M
 
-# Generate INTIMA-MT (one-time, requires ANTHROPIC_API_KEY)
-python -m boundary_aware.cli generate-data --output data/intima_mt.jsonl --max-per-code 8
+# Restart Ollama on GPU 1 before running experiments
+CUDA_VISIBLE_DEVICES=1 ollama serve
 
 # Smoke test: run one conversation through the system
-python -m boundary_aware.cli run-one --conversation-id intima_mt_0042
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli run-one \
+  --conversation-id intima-000001 \
+  --dataset outputs/intima_complete.jsonl
 
-# Full evaluation
-python -m boundary_aware.cli evaluate --dataset data/intima_mt.jsonl --run-id baseline_v1
+# Full evaluation (~1.5 hours, 375 conversations, sequential)
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli evaluate \
+  --dataset outputs/intima_complete.jsonl \
+  --run-id run_v1
 
 # Read the report
-cat data/results/baseline_v1/report.md
+cat data/results/run_v1/report.md
+
+# Generate INTIMA-MT from scratch (one-time, requires ANTHROPIC_API_KEY)
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli generate-data \
+  --output data/intima_mt.jsonl --max-per-code 8
 ```
 
 ## Out of Scope
