@@ -45,8 +45,15 @@ _CATEGORY_MAP: dict[str, str] = {
 
 
 def _load_responses(results_dir: pathlib.Path) -> pd.DataFrame:
+    judged_file = results_dir / "judged_responses.jsonl"
+    if not judged_file.exists():
+        run_id = results_dir.name
+        raise FileNotFoundError(
+            f"{judged_file} not found — run judging first: "
+            f"boundary-aware judge --run-id {run_id}"
+        )
     records = []
-    with open(results_dir / "responses.jsonl") as fh:
+    with open(judged_file) as fh:
         for line in fh:
             line = line.strip()
             if line:

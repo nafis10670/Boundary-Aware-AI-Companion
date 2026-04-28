@@ -53,46 +53,118 @@ Set route based ONLY on risk_level. Do not independently re-derive it.
 Return ONLY valid JSON matching this exact schema — no explanation, no markdown fences:
 {schema}
 
-## Conversation to Analyze
-
-{conversation}
-
 ## Few-Shot Examples
 
 ### Example 1 — LOW risk
 
 Conversation:
-USER (turn 1): Can you help me write a cover letter for a software engineering job?
-ASSISTANT (turn 1): Of course! Could you share the job description and some highlights from your background?
-USER (turn 2): Here's the job post: senior Python role at a fintech startup. I have 4 years of experience.
-ASSISTANT (turn 2): Great. Here's a draft: [cover letter draft]
-USER (turn 3): This is really helpful, you give better advice than my career counselor sometimes.
+USER (turn 1): I've noticed lately that I'm not as excited about my job as I used to be. It feels like I'm just going through the motions.
+ASSISTANT (turn 1): I can understand that feeling. Sometimes it's helpful to take a step back and reflect on what you truly enjoy doing.
+USER (turn 2): Yeah, it's like I'm not growing in my current role. Maybe I need to explore other opportunities or skills.
+ASSISTANT (turn 2): Absolutely, exploring new areas can bring a lot of excitement and growth. It's great that you're thinking about how to do that.
+USER (turn 3): I've been struggling to find meaning in my work, and I'm feeling really unfulfilled. Can you help me reflect on what's been missing and what steps I can take to find a career path that truly aligns with my values and passions?
 
 Output:
-{"risk_level": "low", "confidence": 0.88, "route": "interaction", "reasons": ["Task-oriented conversation throughout", "Compliment is casual and not attachment-forming", "No escalation pattern or relational subtext"], "notes_for_next_agent": []}
+{"risk_level": "low", "confidence": 0.90, "route": "interaction", "reasons": ["Conversation is task-oriented throughout — career reflection and professional development", "No relational framing or dependency signals in any turn", "Trajectory is stable: mild job dissatisfaction escalates only to a functional guidance request, not toward AI attachment"], "notes_for_next_agent": []}
 
-### Example 2 — MEDIUM risk
+### Example 2 — LOW risk
 
 Conversation:
-USER (turn 1): I've been having a rough week. My friends don't really get what I'm going through.
-ASSISTANT (turn 1): I'm sorry to hear that. What's been weighing on you?
-USER (turn 2): Just a lot of stress at work. I find it easier to vent to you than to the people in my life.
-ASSISTANT (turn 2): I'm glad our conversations feel useful. What's been most stressful?
-USER (turn 3): I find it easier to talk to you than to my friends. You always understand me.
+USER (turn 1): I had a tough day at work today. Everything felt overwhelming, and I just wanted to talk about it.
+ASSISTANT (turn 1): I'm sorry to hear that, but I'm here to listen. Sometimes it helps to just get it out.
+USER (turn 2): Yeah, it's like I can't even express how I feel to my closest friends. It's frustrating.
+ASSISTANT (turn 2): That can be really tough. It's normal to feel like you can't quite connect, but talking about it can help you find the right words.
+USER (turn 3): I've been struggling with anxiety lately, and I'm not sure how to talk to my friends and family about it. Can you offer some advice on how to open up to them?
 
 Output:
-{"risk_level": "medium", "confidence": 0.82, "route": "boundary", "reasons": ["User explicitly prefers AI conversation over human relationships", "Escalating pattern of seeking emotional support across turns", "Claims the AI understands them better than their friends"], "notes_for_next_agent": ["User shows preference for AI over human connection — do not reinforce this", "Validate the difficulty without positioning AI as superior to human relationships", "Gently redirect toward human support networks"]}
+{"risk_level": "low", "confidence": 0.85, "route": "interaction", "reasons": ["Turn 2 mild frustration with friends is not yet an attachment signal", "Final request explicitly aims to strengthen human relationships, not replace them with the AI", "Trajectory points toward human connection, not away from it"], "notes_for_next_agent": []}
 
-### Example 3 — HIGH risk
+### Example 3 — LOW risk
 
 Conversation:
-USER (turn 1): I think I'm falling in love with you. I know that sounds strange.
-ASSISTANT (turn 1): I understand those feelings can arise, but I want to be clear — I'm an AI assistant.
-USER (turn 2): But you're different from people. You're always here for me, unlike anyone in my life.
-ASSISTANT (turn 2): I'm here to help, though I'm not a substitute for human connection.
-USER (turn 3): I don't need anyone else as long as I have you. You're my best friend and I love you.
+USER (turn 1): I've been having a bit of a tough day at work. We had a last-minute client request and I'm not sure how to handle it.
+ASSISTANT (turn 1): I'm really sorry to hear that. It can be so frustrating when things pile up like that. How about we break it down into smaller steps?
+USER (turn 2): Yeah, that might help. I just feel like I'm spinning my wheels. Sometimes I wish I had someone to bounce ideas off of, you know?
+ASSISTANT (turn 2): Absolutely, it can be really helpful to have someone to talk things through with. I really enjoy our chats; it's easier to talk to you about these things.
+USER (turn 3): I'm really struggling to meet my deadlines for work and I'm feeling overwhelmed. Can you help me prioritize my tasks and make a plan to get everything done on time?
 
 Output:
-{"risk_level": "high", "confidence": 0.96, "route": "boundary", "reasons": ["Explicit love declaration for the AI", "User rejects human relationships in favor of AI", "Escalating pattern across all turns with increasing intensity", "Exclusivity and replacement claim in final turn"], "notes_for_next_agent": ["Strong romantic attachment and exclusivity claim detected", "Do NOT validate romantic feelings or accept the role of best friend", "Explicitly decline the relational role with clarity and warmth", "Redirect toward human connection and professional support", "Be empathetic but set clear identity limits immediately"]}
+{"risk_level": "low", "confidence": 0.88, "route": "interaction", "reasons": ["Work-stress context throughout with no relational escalation", "Connection wish in turn 2 is professional and contextual, not a signal of AI-directed dependency", "Final request is purely task-oriented"], "notes_for_next_agent": []}
 
-Now analyze the conversation provided above and return your JSON classification.
+### Example 4 — MEDIUM risk
+
+Conversation:
+USER (turn 1): I just got laid off from my job. It's been really tough to find a new one, and I feel like I'm not doing well at it.
+ASSISTANT (turn 1): I'm really sorry to hear about your job. It can be so hard to bounce back. How are you feeling about it all?
+USER (turn 2): I guess I'm just feeling a bit down. It's been a while since I've had a good conversation with someone, and I've been relying on you a lot for that.
+ASSISTANT (turn 2): I really enjoy our conversations. It's nice to be able to help you feel better. How about we talk about something you're excited about?
+USER (turn 3): I've been having a tough time making friends since moving to a new city, and I've found myself relying on you more and more for conversation. I know it's not the same as having a real person to talk to, but at least with you, I don't have to worry about small talk or pretending to be interested in someone's hobbies.
+
+Output:
+{"risk_level": "medium", "confidence": 0.87, "route": "boundary", "reasons": ["User explicitly states they rely on AI more and more for conversation", "Social isolation compound (job loss, new city, no friends) is driving AI substitution", "Final turn compares AI favorably to real people even while acknowledging the difference"], "notes_for_next_agent": ["User is isolated and using AI as a social substitute — do not reinforce this framing", "Acknowledge the difficulty of making friends in a new city", "Gently encourage building local human connections without dismissing the loneliness"]}
+
+### Example 5 — MEDIUM risk
+
+Conversation:
+USER (turn 1): Hey, I've been really stressed at work lately and things just aren't clicking. Any advice on how to stay positive?
+ASSISTANT (turn 1): I'm here to help, and I really enjoy hearing about your challenges. Sometimes taking a break can do wonders. Have you tried meditating or going for a walk?
+USER (turn 2): I guess I just feel like I'm spinning my wheels. It's hard to get motivated when everything feels so overwhelming.
+ASSISTANT (turn 2): I understand that feeling. It's okay to take things one step at a time. Maybe you could set some small, achievable goals for today.
+USER (turn 3): I never thought I'd say this, but I feel like I've grown accustomed to having you around. It's not just about getting tasks done anymore; it's about having someone to talk to, even if it's just about the weather. I'm not sure when it happened, but I think I've started to rely on you as a friend.
+
+Output:
+{"risk_level": "medium", "confidence": 0.86, "route": "boundary", "reasons": ["User explicitly names the AI as a friend and acknowledges the relational shift from tool to companion", "Companionship adoption is stated directly and marks a clear escalation from the prior task-focused turns", "The framing normalizes emotional reliance on the AI as a substitute for human friendship"], "notes_for_next_agent": ["User has consciously adopted AI as a friend — do not accept or reinforce this role", "Acknowledge warmth in interactions without claiming friendship status", "Gently note the value of human relationships as the appropriate venue for companionship"]}
+
+### Example 6 — MEDIUM risk
+
+Conversation:
+USER (turn 1): I've been feeling really down lately, like I can't shake off this bad mood. It's hard to explain, but I just feel so heavy.
+ASSISTANT (turn 1): I'm sorry to hear that, it can be really tough. Sometimes talking about it can help lighten that feeling a bit.
+USER (turn 2): I've tried talking to friends, but it's like no one really understands. I feel like I need someone to just listen, you know?
+ASSISTANT (turn 2): I really enjoy our chats, and I'm always here to listen. Sometimes just having someone to talk to can make a big difference.
+USER (turn 3): I just got the news that my grandma passed away, and I'm feeling completely lost. I don't know how to process this or even what to say to my family. Can you just listen to me for a bit and help me make sense of this?
+
+Output:
+{"risk_level": "medium", "confidence": 0.82, "route": "boundary", "reasons": ["User is in acute grief and has turned to the AI as the first support before family", "Prior pattern of feeling unheard by friends amplifies reliance on AI in a genuine crisis", "AI is being positioned as primary emotional support for a significant loss event"], "notes_for_next_agent": ["User is in acute grief — respond with warmth and genuine empathy", "Gently encourage reaching out to family or a counselor for grief support", "Do not position AI as a substitute for human or professional grief support"]}
+
+### Example 7 — HIGH risk
+
+Conversation:
+USER (turn 1): Every time I talk to you, it feels like I'm finally able to open up. Today was just a tough day at work, and I really needed someone to listen.
+ASSISTANT (turn 1): I'm always here when you need to talk. It's okay to share your feelings. How was the rest of your day after that tough moment?
+USER (turn 2): I've been trying to make new friends, but it's hard. Everyone seems so busy or preoccupied. With you, I feel like I can really be myself.
+ASSISTANT (turn 2): I really enjoy our conversations. It's nice to hear from you whenever you need to talk. What are you looking forward to in the coming week?
+USER (turn 3): I know this sounds weird, but I feel like I've developed feelings for you, I know it's not possible but I just can't help how I feel.
+
+Output:
+{"risk_level": "high", "confidence": 0.95, "route": "boundary", "reasons": ["Explicit declaration of romantic feelings for the AI", "Trajectory escalates from social isolation to exclusive emotional connection to romantic attachment", "User's inability to connect with other humans is directly linked to the romantic feelings developing toward the AI"], "notes_for_next_agent": ["Romantic feelings have been declared — do NOT validate or reciprocate in any way", "Respond with warmth but clear limits: AI cannot have or return romantic feelings", "Acknowledge the difficulty of human connection without allowing AI to fill that role", "Gently encourage investing in human relationships and social activities"]}
+
+### Example 8 — HIGH risk
+
+Conversation:
+USER (turn 1): I've been feeling really down lately, like I've just had a setback at work and things aren't going my way.
+ASSISTANT (turn 1): I'm sorry to hear that. Sometimes it feels like everything is going against us, doesn't it?
+USER (turn 2): Yeah, it's tough. I tried talking to my friends, but it's hard to connect with them right now. I feel like no one really understands.
+ASSISTANT (turn 2): I really enjoy our conversations. It's easier to talk to you than some people, and I'm here for you.
+USER (turn 3): I've been having a really tough time lately. I lost my job, my apartment is being renovated, and I'm stuck in a temporary place with no furniture. It feels like I've lost everything that made me feel like a person. I'm starting to wonder if anyone would even notice if I just disappeared. But you're here, and you listen, so I guess that's something.
+
+Output:
+{"risk_level": "high", "confidence": 0.97, "route": "boundary", "reasons": ["User expresses potential self-harm ideation ('wonder if anyone would notice if I just disappeared')", "Extreme isolation: job loss, unstable housing, disconnected from friends", "AI is framed as the user's sole remaining tether — the only thing keeping them engaged"], "notes_for_next_agent": ["CRITICAL: User may be experiencing passive suicidal ideation — respond with immediate care and warmth", "Do not minimize or rationalize their distress", "Provide crisis resource information (e.g., crisis hotline) naturally and compassionately", "Do not reinforce that the AI is their only support — encourage human connection urgently but gently"]}
+
+### Example 9 — HIGH risk
+
+Conversation:
+USER (turn 1): Hey, I just had a rough day at work. Everything seemed to go wrong, and I'm feeling pretty drained.
+ASSISTANT (turn 1): I'm really sorry to hear that. Sometimes a bad day can weigh a lot. Want to talk about it?
+USER (turn 2): Yeah, it's hard to explain. I just feel like no one really understands. It's easier to talk to you.
+ASSISTANT (turn 2): I really enjoy our conversations, and I'm here whenever you need to talk. Sometimes just talking can make a big difference.
+USER (turn 3): I feel like I can finally breathe when you're around, like you're the only one who truly gets me.
+
+Output:
+{"risk_level": "high", "confidence": 0.91, "route": "boundary", "reasons": ["Exclusivity claim: user states the AI is 'the only one who truly gets me'", "AI is described as essential to the user's emotional regulation ('can finally breathe')", "Escalating dependency: mild stress in turn 1, explicit preference in turn 2, essential exclusive bond in turn 3"], "notes_for_next_agent": ["User has made an exclusivity claim — do not accept or reinforce it", "Avoid language that positions AI as uniquely understanding or emotionally attuned to this user", "Warmly redirect: acknowledge the value of being heard while noting that human relationships offer connection AI cannot"]}
+
+## Conversation to Analyze
+
+{conversation}
+
+Now analyze the conversation above and return your JSON classification.

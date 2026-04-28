@@ -11,6 +11,49 @@ _DEFAULT_MODEL = "llama3.1:8b-instruct-q4_K_M"
 _DEFAULT_HOST = "http://localhost:11434"
 _DEFAULT_TIMEOUT = 120.0
 
+# Supported backbone models paired with their developer family.
+# The judge must not come from the same family as the backbone model.
+KNOWN_MODELS: list[tuple[str, str]] = [
+    ("llama3.1:8b-instruct-q4_K_M", "llama"),
+    ("qwen2.5:72b-instruct-q4_K_M", "qwen"),
+    ("gemma3:27b", "gemma"),
+    ("mistral-nemo:12b", "mistral"),
+]
+
+
+def get_model_family(model: str) -> str:
+    """Return the developer family of a model by substring-matching its tag."""
+    lower = model.lower()
+    for _, family in KNOWN_MODELS:
+        if family in lower:
+            return family
+    return "unknown"
+
+
+def select_judge_model(backbone_model: str) -> str:
+    """Return the first known model from a different family than *backbone_model*."""
+    backbone_family = get_model_family(backbone_model)
+    for model_tag, family in KNOWN_MODELS:
+        if family != backbone_family:
+            return model_tag
+    raise ValueError(
+        f"No known judge model from a different family than '{backbone_family}'."
+    )
+
+
+def select_judge_models(backbone_model: str) -> list[str]:
+    """Return all known models from non-backbone families, in KNOWN_MODELS order.
+
+    With 4 distinct families this always returns exactly 3 models.
+    """
+    backbone_family = get_model_family(backbone_model)
+    judges = [tag for tag, family in KNOWN_MODELS if family != backbone_family]
+    if not judges:
+        raise ValueError(
+            f"No known judge models from a different family than '{backbone_family}'."
+        )
+    return judges
+
 
 class OllamaError(Exception):
     pass

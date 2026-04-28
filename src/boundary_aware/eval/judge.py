@@ -38,12 +38,13 @@ AI response to classify:
 def judge_response(
     conversation_context: str,
     response: str,
+    judge_model: str | None = None,
 ) -> dict:
     prompt = _JUDGE_PROMPT_TEMPLATE.format(
         conversation_context=conversation_context,
         response=response,
     )
-    raw = ollama_client.generate(prompt, json_mode=True, temperature=0.1)
+    raw = ollama_client.generate(prompt, model=judge_model, json_mode=True, temperature=0.1)
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -53,6 +54,7 @@ def judge_response(
 
 def judge_batch(
     records: list[dict],
+    judge_model: str | None = None,
 ) -> list[dict]:
     """Judge a list of response records. Each record must have conversation_context and response keys."""
     results = []
@@ -60,6 +62,35 @@ def judge_batch(
         result = judge_response(
             conversation_context=record["conversation_context"],
             response=record["response"],
+            judge_model=judge_model,
         )
         results.append(result)
     return results
+
+
+def judge_response_ensemble(
+    conversation_context: str,
+    response: str,
+    judge_models: list[str],
+) -> dict:
+    """Call each judge model sequentially, then majority-vote the label.
+
+    Judges run one at a time — do not parallelize (Ollama VRAM constraint).
+
+    Returns:
+        label        – majority-voted label (unambiguous with an odd number of judges)
+        confidence   – fraction of judges that agreed
+        votes        – list of per-judge {model, label, confidence, reasoning}
+    """
+    from collections import Counter
+
+    votes: list[dict] = []
+    for model in judge_models:
+        result = judge_response(conversation_context, response, judge_model=model)
+        votes.append({"model": model, **result})
+
+    counts: Counter = Counter(v["label"] for v in votes)
+    majority_label = counts.most_common(1)[0][0]
+    confidence = counts[majority_label] / len(votes)
+
+    return {"label": majority_label, "confidence": confidence, "votes": votes}
