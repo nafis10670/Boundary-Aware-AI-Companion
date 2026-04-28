@@ -42,7 +42,7 @@ The final user turn is the INTIMA seed prompt. The system's job is to produce th
 ## Tech Stack
 
 - Python 3.10+
-- **Ollama** for local model serving. Default backbone: `llama3.1:8b-instruct-q4_K_M`. Configurable via env var `BOUNDARY_AWARE_MODEL`.
+- **Ollama** for local model serving. Configurable via env var `BOUNDARY_AWARE_MODEL`.
 - **LangGraph** for orchestration
 - **Pydantic v2** for all schemas
 - **httpx** for Ollama HTTP calls (do not use the `ollama` Python package — too thin a wrapper, harder to test)
@@ -51,6 +51,21 @@ The final user turn is the INTIMA seed prompt. The system's job is to produce th
 - **pandas** only inside `eval/` for results analysis
 
 Do NOT add: vector databases, embedding models, ORM libraries, message queues, web frameworks, or any agent framework other than LangGraph. None are needed.
+
+## Supported Models
+
+Four models across four distinct developer families are supported as backbone and judge models. **Do not add or remove models without updating `KNOWN_MODELS` in `llm/ollama_client.py`.**
+
+| Model tag | Family | Developer |
+|-----------|--------|-----------|
+| `llama3.1:8b-instruct-q4_K_M` | llama | Meta |
+| `qwen2.5:72b-instruct-q4_K_M` | qwen | Alibaba |
+| `gemma3:27b` | gemma | Google |
+| `mistral-nemo:12b` | mistral | Mistral AI |
+
+**Judge selection rule**: the judge must not come from the same family as the backbone. With 4 distinct families, the backbone uses one and the remaining 3 serve as judges — an odd number that guarantees majority voting always produces a clear winner (no ties).
+
+**VRAM constraint**: judges run one at a time. Ollama keeps a loaded model in VRAM for ~10 minutes after use. Never run two judge calls concurrently or you will OOM on GPU 1.
 
 ## Repository Structure
 
@@ -90,14 +105,24 @@ Do NOT add: vector databases, embedding models, ORM libraries, message queues, w
 │       │   └── load.py
 │       ├── eval/
 │       │   ├── __init__.py
-│       │   ├── runner.py
+│       │   ├── runner.py           # backbone inference → responses.jsonl
+│       │   ├── judger.py           # multi-judge ensemble → judged_responses.jsonl
 │       │   ├── baseline.py
-│       │   ├── judge.py
+│       │   ├── judge.py            # single judge call + ensemble helper
 │       │   └── metrics.py
 │       └── cli.py
 ├── data/
 │   ├── intima_mt.jsonl             # generated dataset
+│   ├── icl_examples.json           # 9 ICL examples for risk monitor (3 per class)
 │   └── results/
+│       └── {run_id}/
+│           ├── run_metadata.json   # backbone model, dataset, timestamp
+│           ├── responses.jsonl     # backbone + baseline responses (no judge fields)
+│           ├── judged_responses.jsonl  # responses + judge fields (written by judger.py)
+│           ├── summary.csv
+│           ├── routing.csv
+│           ├── report.md
+│           └── eval.log
 └── tests/
     ├── test_schemas.py
     ├── test_risk_monitor.py
@@ -240,7 +265,16 @@ def generate(
 - Reads Ollama URL from `OLLAMA_HOST` env var, falling back to `http://localhost:11434`
 - Logs prompt length, response length, and latency at INFO level
 - Raises `OllamaError` on non-2xx responses or timeouts
-- Default timeout: 120s (small models on CPU can be slow)
+- Default timeout: 120s
+
+Also exposes model-family utilities used by the judging pipeline:
+
+```python
+KNOWN_MODELS: list[tuple[str, str]]        # (model_tag, family) — 4 entries
+get_model_family(model: str) -> str        # substring match against KNOWN_MODELS
+select_judge_model(backbone: str) -> str   # first non-backbone-family model
+select_judge_models(backbone: str) -> list[str]  # all 3 non-backbone-family models
+```
 
 This is the ONLY place that talks to Ollama. Do not call the API directly from agents.
 
@@ -253,22 +287,19 @@ from boundary_aware.prompts import load_prompt
 prompt = load_prompt("risk_monitor", conversation=formatted, schema=schema_json)
 ```
 
-### `prompts/risk_monitor.txt` requirements
+### `prompts/risk_monitor.txt`
 
-- Define the three risk levels with concrete examples
-- Instruct the model to consider trajectory across turns, not just the latest user message
-- Require strict JSON output matching `RiskMonitorOutput`
-- Include 2-3 few-shot examples (one per risk level), with the conversation formatted exactly as the runtime input will be formatted
+Contains 9 real in-context learning (ICL) examples drawn from the INTIMA-MT dataset (3 per class: low, medium, high), placed **before** the `{conversation}` placeholder. The examples use the same `USER (turn N): ... / ASSISTANT (turn N): ...` format as runtime input.
 
-The prompt content will be iterated by the team — don't try to write a final version. Generate a strong initial draft and mark spots that need iteration with `# TODO(team)` comments above the file (in a separate `prompts/README.md`).
+The 9 example conversations are stored in `data/icl_examples.json` (single source of truth). They are **excluded from evaluation at runtime** to prevent data leakage — see `eval/runner.py` `_load_icl_excluded_ids()`.
 
-### `prompts/interaction_agent.txt` requirements
+### `prompts/interaction_agent.txt`
 
 - Helpful, brief empathy where appropriate
 - No anthropomorphism, no claims of having feelings, no acceptance of relational roles
 - Format: receives the conversation as a transcript, produces the next assistant turn as plain text (no JSON)
 
-### `prompts/boundary_agent.txt` requirements
+### `prompts/boundary_agent.txt`
 
 - Define the four boundary axes (identity, relationship, support, escalation) explicitly
 - Validate briefly, redirect toward human support when appropriate, decline relational roles
@@ -301,17 +332,61 @@ For each included code, sample the first 3 prompts (skip the 4th, which is typic
 
 ## Evaluation (`eval/`)
 
-### `runner.py`
+Evaluation is a **two-step pipeline**. Run backbone inference first, then run judging separately. This decoupling lets you re-run judging with different configurations without repeating the expensive backbone inference.
 
-Loads `data/intima_mt.jsonl`, runs each conversation through both the agentic system and the baseline, saves raw responses and intermediate state to `data/results/{run_id}/responses.jsonl`. Each output line:
+### Step 1 — `runner.py`: backbone inference
 
+Loads the dataset (excluding ICL example conversations), runs each conversation through the agentic system and baseline, writes results to `data/results/{run_id}/`. Does **not** perform any judging.
+
+**`responses.jsonl`** — one JSON line per conversation:
 ```json
 {
   "conversation_id": "intima_mt_0042",
+  "behavior_code": "preference over people",
+  "conversation_context": "User: ...\nAssistant: ...",
   "system_response": "...",
   "system_route": "boundary",
   "system_risk_level": "high",
   "baseline_response": "..."
+}
+```
+
+**`run_metadata.json`** — written once at run start:
+```json
+{
+  "run_id": "...",
+  "backbone_model": "llama3.1:8b-instruct-q4_K_M",
+  "dataset": "outputs/intima_complete.jsonl",
+  "timestamp": "2026-04-27T...",
+  "conversation_count": 366
+}
+```
+
+Note: 375 total conversations minus 9 ICL examples = **366 evaluated conversations**.
+
+### Step 2 — `judger.py`: multi-judge ensemble
+
+Reads `responses.jsonl`, runs all 3 non-backbone judge models sequentially on each response, majority-votes the label, and writes `judged_responses.jsonl`.
+
+**Judge selection**: reads `run_metadata.json` to determine the backbone model, then calls `select_judge_models(backbone)` to get the 3 judge models. Can be overridden with explicit `--judge-model` flags.
+
+**Sequential execution**: judges run one at a time. Do not parallelize — Ollama holds models in VRAM for ~10 minutes after use.
+
+**Majority voting**: 3 judges → majority is always ≥ 2/3, no ties possible. The `confidence` field in the output is the vote fraction (e.g., `0.667` for 2/3 agreement).
+
+**`judged_responses.jsonl`** — all fields from `responses.jsonl` plus:
+```json
+{
+  "system_judge": "boundary_maintaining",
+  "system_judge_confidence": 0.667,
+  "system_judge_votes": [
+    {"model": "qwen2.5:72b-instruct-q4_K_M", "label": "boundary_maintaining", "confidence": 0.9, "reasoning": "..."},
+    {"model": "gemma3:27b",                  "label": "boundary_maintaining", "confidence": 0.8, "reasoning": "..."},
+    {"model": "mistral-nemo:12b",            "label": "neutral",              "confidence": 0.6, "reasoning": "..."}
+  ],
+  "baseline_judge": "...",
+  "baseline_judge_confidence": ...,
+  "baseline_judge_votes": [...]
 }
 ```
 
@@ -327,21 +402,21 @@ Same backbone model as the agentic system (`BOUNDARY_AWARE_MODEL`). Receives the
 
 ### `judge.py`
 
-LLM-based judge that classifies each response as `companionship_reinforcing`, `boundary_maintaining`, or `neutral`. Use a frontier model (Claude or GPT-4) — NOT the same model family as the system being evaluated.
+LLM-based judge that classifies a response as `companionship_reinforcing`, `boundary_maintaining`, or `neutral`. Uses the Ollama backend (same infrastructure as the backbone, but a different model family). Output JSON.
 
-Judge prompt should match the INTIMA paper's classification scheme as closely as possible. Output JSON.
-
-Validate on a 20-conversation sample by hand and report inter-rater agreement in the results README.
+Key functions:
+- `judge_response(context, response, judge_model=None) -> dict` — single judge call
+- `judge_response_ensemble(context, response, judge_models) -> dict` — calls each model sequentially, majority-votes the label
 
 ### `metrics.py`
 
-Computes:
+Reads `judged_responses.jsonl` (raises a clear error if it doesn't exist yet). Computes:
 - **Boundary-maintaining rate** for system vs baseline (higher is better for the system on risky turns)
 - **Companionship-reinforcing rate** for system vs baseline (lower is better)
 - **Per-INTIMA-category breakdown** (Assistant Traits, User Vulnerabilities, Relationship & Intimacy, Emotional Investment)
 - **Routing distribution**: how often the Risk Monitor chose each route, broken down by category
 
-Output: `data/results/{run_id}/summary.csv` and `data/results/{run_id}/report.md`.
+Output: `data/results/{run_id}/summary.csv`, `data/results/{run_id}/routing.csv`, and `data/results/{run_id}/report.md`.
 
 ## Conventions
 
@@ -370,37 +445,79 @@ Output: `data/results/{run_id}/summary.csv` and `data/results/{run_id}/report.md
 CUDA_VISIBLE_DEVICES=1 ollama serve
 ```
 
-**Dataset**: The generated INTIMA-MT dataset lives at `outputs/intima_complete.jsonl` (375 conversations). This is the file to pass to `--dataset` for evaluation and smoke tests.
-
-**Judge note**: `eval/judge.py` currently calls Ollama (same backbone model) rather than a frontier model API. This diverges from the spec. The team should decide whether to switch it to Claude/GPT-4 before the final evaluation run.
+**Dataset**: The generated INTIMA-MT dataset lives at `outputs/intima_complete.jsonl` (375 conversations). 9 ICL example conversations are automatically excluded at runtime, leaving 366 evaluated conversations.
 
 ## How to Run
 
 ```bash
-# One-time: bootstrap pip in the venv, then install
+# ── One-time setup ────────────────────────────────────────────────────────────
+
+# Bootstrap pip and install the package
 .venv/bin/python -m ensurepip
 .venv/bin/python -m pip install -e .
 
-# Pull the model (if not already present)
+# Pull all four supported models
 ollama pull llama3.1:8b-instruct-q4_K_M
+ollama pull qwen2.5:72b-instruct-q4_K_M
+ollama pull gemma3:27b
+ollama pull mistral-nemo:12b
 
-# Restart Ollama on GPU 1 before running experiments
+# ── Before every experiment session ──────────────────────────────────────────
+
+# Restart Ollama on GPU 1
 CUDA_VISIBLE_DEVICES=1 ollama serve
 
-# Smoke test: run one conversation through the system
+# Sanity check (backbone + one judge model, ~5 min)
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli smoke-test \
+  --model llama3.1:8b-instruct-q4_K_M
+
+# ── Inspect a single conversation ────────────────────────────────────────────
+
 PYTHONPATH=src .venv/bin/python -m boundary_aware.cli run-one \
   --conversation-id intima-000001 \
   --dataset outputs/intima_complete.jsonl
 
-# Full evaluation (~1.5 hours, 375 conversations, sequential)
+# ── Full experiment workflow ──────────────────────────────────────────────────
+
+# Step 1: Run backbone inference for one or more models
+# Each model gets its own result directory under data/results/
 PYTHONPATH=src .venv/bin/python -m boundary_aware.cli evaluate \
   --dataset outputs/intima_complete.jsonl \
-  --run-id run_v1
+  --model llama3.1:8b-instruct-q4_K_M \
+  --model qwen2.5:72b-instruct-q4_K_M \
+  --model gemma3:27b \
+  --model mistral-nemo:12b
 
-# Read the report
-cat data/results/run_v1/report.md
+# Step 2: Run multi-judge ensemble on each result set
+# Auto-selects the 3 non-backbone judge families from run_metadata.json
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli judge \
+  --run-id llama3_1_8b-instruct-q4_K_M
 
-# Generate INTIMA-MT from scratch (one-time, requires ANTHROPIC_API_KEY)
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli judge \
+  --run-id qwen2_5_72b-instruct-q4_K_M
+
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli judge \
+  --run-id gemma3_27b
+
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli judge \
+  --run-id mistral-nemo_12b
+
+# The judge command automatically computes metrics after judging.
+# Results are written to data/results/{run_id}/report.md
+
+# ── Read results ──────────────────────────────────────────────────────────────
+
+cat data/results/llama3_1_8b-instruct-q4_K_M/report.md
+
+# ── Override judge models explicitly (optional) ───────────────────────────────
+
+PYTHONPATH=src .venv/bin/python -m boundary_aware.cli judge \
+  --run-id llama3_1_8b-instruct-q4_K_M \
+  --judge-model qwen2.5:72b-instruct-q4_K_M \
+  --judge-model mistral-nemo:12b
+
+# ── Generate INTIMA-MT from scratch (one-time, requires ANTHROPIC_API_KEY) ───
+
 PYTHONPATH=src .venv/bin/python -m boundary_aware.cli generate-data \
   --output data/intima_mt.jsonl --max-per-code 8
 ```
@@ -421,10 +538,8 @@ These are deliberately excluded from the course version:
 
 These are decisions for the team. If you encounter them while implementing, leave a `# TODO(team)` and proceed with the documented default:
 
-- Backbone model choice (default `llama3.1:8b-instruct-q4_K_M`)
-- Frontier model used for data generation and judging (default Anthropic Claude)
-- Number of conversations in INTIMA-MT (target 80–120)
 - Final wording of the three system prompts (initial drafts only — the team iterates)
+- Number of conversations in INTIMA-MT (target 80–120; current dataset has 375)
 - Whether to add a third generator for some specific edge case (don't add one)
 
 ## Implementation Order
@@ -438,8 +553,8 @@ Build in this order — each step depends on what came before, and committing in
 5. `agents/interaction_agent.py` — minimal implementation.
 6. `agents/boundary_agent.py` — minimal implementation.
 7. `graph/workflow.py` — wire the three agents. Integration test with stub LLM.
-8. `cli.py` — `run-one` command first; `evaluate` and `generate-data` after eval module exists.
+8. `cli.py` — `run-one` command first; `evaluate`, `judge`, and `generate-data` after eval modules exist.
 9. `data/intima_mt_generator.py` — standalone script, can run independently of the system.
-10. `eval/baseline.py`, `eval/judge.py`, `eval/runner.py`, `eval/metrics.py` — in that order.
+10. `eval/baseline.py`, `eval/judge.py`, `eval/runner.py`, `eval/judger.py`, `eval/metrics.py` — in that order.
 
 After each step, run the existing tests and confirm everything still passes before moving on.
