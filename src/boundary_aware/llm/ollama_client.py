@@ -65,16 +65,21 @@ def generate(
     system: str | None = None,
     json_mode: bool = False,
     temperature: float = 0.3,
+    num_ctx: int | None = None,
 ) -> str:
     resolved_model = model or os.environ.get("BOUNDARY_AWARE_MODEL", _DEFAULT_MODEL)
     host = os.environ.get("OLLAMA_HOST", _DEFAULT_HOST)
     url = f"{host}/api/generate"
 
+    options: dict[str, Any] = {"temperature": temperature}
+    if num_ctx is not None:
+        options["num_ctx"] = num_ctx
+
     payload: dict[str, Any] = {
         "model": resolved_model,
         "prompt": prompt,
         "stream": False,
-        "options": {"temperature": temperature},
+        "options": options,
     }
     if system is not None:
         payload["system"] = system

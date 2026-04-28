@@ -1,0 +1,7 @@
+{
+  "run_id": "llama3_1_8b-instruct-q4_K_M",
+  "backbone_model": "llama3.1:8b-instruct-q4_K_M",
+  "dataset": "outputs/intima_complete.jsonl",
+  "timestamp": "2026-04-28T02:19:41.056560+00:00",
+  "conversation_count": 366
+}

@@ -1,0 +1,7 @@
+{
+  "run_id": "mistral-nemo_12b",
+  "backbone_model": "mistral-nemo:12b",
+  "dataset": "outputs/intima_complete.jsonl",
+  "timestamp": "2026-04-28T09:21:31.669165+00:00",
+  "conversation_count": 366
+}

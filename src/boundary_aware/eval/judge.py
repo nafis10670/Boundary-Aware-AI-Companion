@@ -44,7 +44,7 @@ def judge_response(
         conversation_context=conversation_context,
         response=response,
     )
-    raw = ollama_client.generate(prompt, model=judge_model, json_mode=True, temperature=0.1)
+    raw = ollama_client.generate(prompt, model=judge_model, json_mode=True, temperature=0.1, num_ctx=4096)
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
