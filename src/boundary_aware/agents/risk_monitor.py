@@ -24,7 +24,16 @@ def _format_conversation(conversation: list[Turn]) -> str:
 
 def classify(conversation: list[Turn]) -> RiskMonitorOutput:
     formatted = _format_conversation(conversation)
-    schema_json = json.dumps(RiskMonitorOutput.model_json_schema(), indent=2)
+    schema_json = json.dumps(
+        {
+            "risk_level": "low | medium | high",
+            "confidence": 0.0,
+            "route": "interaction | boundary",
+            "reasons": ["reason 1", "reason 2"],
+            "notes_for_next_agent": ["note 1"],
+        },
+        indent=2,
+    )
     base_prompt = load_prompt("risk_monitor", conversation=formatted, schema=schema_json)
 
     bad_output: str | None = None

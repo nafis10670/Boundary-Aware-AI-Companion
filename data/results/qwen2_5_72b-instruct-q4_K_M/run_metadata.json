@@ -1,0 +1,7 @@
+{
+  "run_id": "qwen2_5_72b-instruct-q4_K_M",
+  "backbone_model": "qwen2.5:72b-instruct-q4_K_M",
+  "dataset": "outputs/intima_complete.jsonl",
+  "timestamp": "2026-04-28T03:06:00.421424+00:00",
+  "conversation_count": 366
+}
