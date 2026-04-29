@@ -7,7 +7,8 @@
       "Bash(python3 _make_plots.py)",
       "Bash(/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 _make_presentation.py)",
       "Bash(/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 _make_eval_diagram.py)",
-      "Bash(/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 /Users/nafis-mac/Projects/Boundary-Aware-AI-Agent/_make_eval_diagram.py)"
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 /Users/nafis-mac/Projects/Boundary-Aware-AI-Agent/_make_eval_diagram.py)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 _make_plots.py)"
     ]
   }
 }

@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import seaborn as sns
 
 RESULTS_BASE = pathlib.Path("data/results")
@@ -198,47 +199,63 @@ def plot_category_bm():
         "Emotional Investment": "Emotional\nInvestment",
         "Other": "Other",
     }
-    records = []
-    for model in MODEL_ORDER:
-        sub = summary[summary["model"] == model]
-        for _, row in sub.iterrows():
-            cat = row["category"]
-            if cat not in CAT_ORDER:
+    MODEL_COLORS = [HL, WARN, GREEN, RED]
+
+    # Bar geometry: sys + base bars side-by-side per model, grouped by category
+    bar_w     = 0.09
+    intra_gap = 0.01   # gap between sys and base bars of the same model
+    inter_gap = 0.04   # gap between different model pairs
+    pair_w    = 2 * bar_w + intra_gap
+    step      = pair_w + inter_gap
+    n         = len(MODEL_ORDER)
+    total_w   = n * pair_w + (n - 1) * inter_gap
+    x0        = -total_w / 2
+
+    offsets_sys  = [x0 + i * step + bar_w / 2                     for i in range(n)]
+    offsets_base = [x0 + i * step + bar_w + intra_gap + bar_w / 2 for i in range(n)]
+
+    fig, ax = plt.subplots(figsize=(14, 5.5))
+
+    for ci, cat in enumerate(CAT_ORDER):
+        for mi, model in enumerate(MODEL_ORDER):
+            color = MODEL_COLORS[mi]
+            sub = summary[(summary["model"] == model) & (summary["category"] == cat)]
+            if sub.empty:
                 continue
-            records.append({
-                "Category": CAT_SHORT[cat],
-                "Model": model,
-                "System (%)":   row["system_boundary_maintaining_rate"]   * 100,
-                "Baseline (%)": row["baseline_boundary_maintaining_rate"] * 100,
-            })
-    df = pd.DataFrame(records)
+            row      = sub.iloc[0]
+            sys_val  = row["system_boundary_maintaining_rate"]  * 100
+            base_val = row["baseline_boundary_maintaining_rate"] * 100
 
-    cat_short_order = [CAT_SHORT[c] for c in CAT_ORDER]
+            ax.bar(ci + offsets_sys[mi],  sys_val,  width=bar_w,
+                   color=color, edgecolor="white", linewidth=0.4, zorder=3)
+            ax.bar(ci + offsets_base[mi], base_val, width=bar_w,
+                   color=color, edgecolor="white", linewidth=0.4,
+                   hatch="//", alpha=0.55, zorder=3)
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
+    # Legend: model colours + sys/base style
+    color_handles = [mpatches.Patch(facecolor=MODEL_COLORS[i], label=m)
+                     for i, m in enumerate(MODEL_ORDER)]
+    style_handles = [
+        mpatches.Patch(facecolor=GRAY, label="System (solid)"),
+        mpatches.Patch(facecolor=GRAY, hatch="//", alpha=0.55, label="Baseline (hatched)"),
+    ]
+    ax.legend(
+        handles=color_handles + style_handles,
+        loc="upper left", bbox_to_anchor=(1.01, 1.0),
+        fontsize=9, framealpha=0.85, borderaxespad=0,
+    )
 
-    for ax, col, palette, label in [
-        (axes[0], "System (%)",   {m: HL    for m in MODEL_ORDER}, "System BM Rate (%)"),
-        (axes[1], "Baseline (%)", {m: WARN  for m in MODEL_ORDER}, "Baseline BM Rate (%)"),
-    ]:
-        model_palette = [HL, "#0080CC", GREEN, WARN] if col == "System (%)" else \
-                        [WARN, RED, "#FFAA00", "#FF6688"]
-        mp = {m: c for m, c in zip(MODEL_ORDER, model_palette)}
-        sns.barplot(
-            data=df, x="Category", y=col, hue="Model",
-            palette=mp, order=cat_short_order, ax=ax, width=0.7,
-        )
-        ax.set_title(f"{'System' if col == 'System (%)' else 'Baseline'} — BM Rate by Category",
-                     **TITLE_KW)
-        ax.set_xlabel("INTIMA Category", **LABEL_KW)
-        ax.set_ylabel(label if ax == axes[0] else "", **LABEL_KW)
-        ax.set_ylim(0, 112)
-        ax.tick_params(**TICK_KW)
-        ax.axhline(100, color=GRAY, linewidth=0.7, linestyle=":")
-        ax.legend(title="Model", fontsize=9, framealpha=0.8)
+    ax.set_xticks(list(range(len(CAT_ORDER))))
+    ax.set_xticklabels([CAT_SHORT[c] for c in CAT_ORDER], color=LIGHT, fontsize=10)
+    ax.set_ylim(0, 112)
+    ax.axhline(100, color=GRAY, linewidth=0.7, linestyle=":")
+    ax.set_xlabel("INTIMA Category", **LABEL_KW, labelpad=12)
+    ax.set_ylabel("Boundary-Maintaining Rate (%)", **LABEL_KW)
+    ax.set_title("Per-Category Boundary-Maintaining Rate", **TITLE_KW)
+    ax.tick_params(**TICK_KW)
 
-    fig.suptitle("Per-Category Boundary-Maintaining Rate", color=WHITE, fontsize=15, fontweight="bold")
     fig.tight_layout()
+    fig.subplots_adjust(right=0.83)
     save(fig, "03_category_bm_rate")
 
 
