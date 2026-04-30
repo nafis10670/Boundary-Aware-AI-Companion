@@ -191,3 +191,6 @@ data/INTIMA_retry*.jsonl
 scripts/debug_output.py
 scripts/inspect_output.py
 CLAUDE.md
+CLAUDE.md
+presentation.pptx
+_make_presentation.py
