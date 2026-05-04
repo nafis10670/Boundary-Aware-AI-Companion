@@ -90,12 +90,12 @@ MID_C  = CP + CW / 2   # 7.15
 
 # Arrow
 arr(4.95, 3.7, 9.35, 3.7, color=C_WARN, lw=3.0)
-txt(MID_C, 4.07, "extend via Claude API", size=10, italic=True, color=C_WARN)
+txt(MID_C, 4.07, "extend via Qwen 2.5", size=10, italic=True, color=C_WARN)
 
 # Generation box (above arrow)
 fbox(CP, 4.35, CW, 2.3, fc=C_WARN_LT, ec=C_WARN, lw=1.8, radius=0.2)
 txt(MID_C, 6.4, "Generation Process", size=13, bold=True, color=C_WARN)
-txt(MID_C, 6.07, "Claude API (Anthropic)", size=11, color=C_BODY)
+txt(MID_C, 6.07, "Qwen 2.5", size=11, color=C_BODY)
 ax.plot([CP + 0.2, CP + CW - 0.2], [5.82, 5.82], color=C_WARN, lw=0.8, alpha=0.5, zorder=3)
 txt(MID_C, 5.53,
     "Write 2 synthetic prior turns that escalate\nnaturally toward the seed prompt.",
